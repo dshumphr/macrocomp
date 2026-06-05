@@ -389,16 +389,26 @@ def parse_stream_json(stdout: str, stderr: str) -> dict:
     """
     Parse claude CLI stream-json events to extract:
     - bash commands from assistant tool_use content blocks
+    - tool results from user tool_result content blocks
+    - full turn-by-turn transcript for training data synthesis
     - total usage tokens from the result event
 
     Claude CLI stream-json format (v2.x):
       {"type":"assistant","message":{"content":[{"type":"tool_use","name":"Bash","input":{"command":"..."}}],...}}
+      {"type":"user","message":{"content":[{"type":"tool_result","tool_use_id":"...","content":"..."}]},...}
       {"type":"result","usage":{"input_tokens":N,...}}
     """
     bash_commands = []
     total_input_tokens = 0
     total_output_tokens = 0
     error = None
+
+    # Full transcript: list of turn dicts for training data synthesis
+    # Each turn: {"role": "assistant"|"tool", "content": [...], "tool_use_id": ...}
+    transcript: list[dict] = []
+
+    # Track pending tool_use IDs so we can correlate results
+    pending_tool_uses: dict[str, str] = {}  # id -> command
 
     for line in stdout.splitlines():
         line = line.strip()
@@ -412,19 +422,72 @@ def parse_stream_json(stdout: str, stderr: str) -> dict:
         etype = evt.get("type", "")
 
         if etype == "assistant":
-            # Full message object with content array
             msg = evt.get("message", {})
             usage = msg.get("usage", {})
             total_input_tokens += usage.get("input_tokens", 0)
             total_output_tokens += usage.get("output_tokens", 0)
 
-            for block in msg.get("content", []):
-                if isinstance(block, dict) and block.get("type") == "tool_use":
-                    if block.get("name") == "Bash":
-                        inp = block.get("input", {})
-                        cmd = inp.get("command", "")
+            content_blocks = msg.get("content", [])
+            turn_text = ""
+            turn_tool_calls = []
+
+            for block in content_blocks:
+                if not isinstance(block, dict):
+                    continue
+                if block.get("type") == "text":
+                    turn_text += block.get("text", "")
+                elif block.get("type") == "tool_use":
+                    tool_id = block.get("id", "")
+                    tool_name = block.get("name", "")
+                    tool_input = block.get("input", {})
+                    if tool_name == "Bash":
+                        cmd = tool_input.get("command", "")
                         if cmd:
                             bash_commands.append(cmd)
+                            pending_tool_uses[tool_id] = cmd
+                    turn_tool_calls.append({
+                        "tool_use_id": tool_id,
+                        "name": tool_name,
+                        "input": tool_input,
+                    })
+
+            if turn_text or turn_tool_calls:
+                transcript.append({
+                    "role": "assistant",
+                    "text": turn_text,
+                    "tool_calls": turn_tool_calls,
+                })
+
+        elif etype == "user":
+            # Tool results come back as user messages
+            msg = evt.get("message", {})
+            for block in msg.get("content", []):
+                if not isinstance(block, dict):
+                    continue
+                if block.get("type") == "tool_result":
+                    tool_id = block.get("tool_use_id", "")
+                    result_content = block.get("content", "")
+                    if isinstance(result_content, list):
+                        # Sometimes content is a list of text blocks
+                        result_content = " ".join(
+                            b.get("text", "") for b in result_content if isinstance(b, dict)
+                        )
+                    is_error = block.get("is_error", False)
+                    # Also pull from tool_use_result if present (Claude Code specific)
+                    tool_result = evt.get("tool_use_result", {})
+                    stdout_out = tool_result.get("stdout", result_content)
+                    stderr_out = tool_result.get("stderr", "")
+                    output = stdout_out
+                    if stderr_out:
+                        output = (output + "\n" + stderr_out).strip()
+
+                    transcript.append({
+                        "role": "tool",
+                        "tool_use_id": tool_id,
+                        "command": pending_tool_uses.get(tool_id, ""),
+                        "output": output[:4000],  # cap for storage
+                        "is_error": is_error,
+                    })
 
         elif etype == "result":
             subtype = evt.get("subtype", "")
@@ -432,7 +495,6 @@ def parse_stream_json(stdout: str, stderr: str) -> dict:
                 error = subtype
             usage = evt.get("usage", {})
             if usage:
-                # result.usage is cumulative total — use it as the authoritative count
                 total_input_tokens = usage.get("input_tokens", total_input_tokens)
                 total_output_tokens = usage.get("output_tokens", total_output_tokens)
 
@@ -443,6 +505,7 @@ def parse_stream_json(stdout: str, stderr: str) -> dict:
         "bash_commands": bash_commands,
         "total_input_tokens": total_input_tokens,
         "total_output_tokens": total_output_tokens,
+        "transcript": transcript,
         "error": error,
     }
 
@@ -451,8 +514,10 @@ def parse_stream_json(stdout: str, stderr: str) -> dict:
 # Main runner                                                          #
 # ------------------------------------------------------------------ #
 
-def run_task(task: dict, condition: str, max_turns: int) -> TaskResult:
+def run_task(task: dict, condition: str, max_turns: int) -> tuple["TaskResult", list[dict]]:
+    """Returns (TaskResult, transcript). Transcript is the raw turn-by-turn list for synthesis."""
     result = TaskResult(task_id=task['task_id'], condition=condition)
+    saved_transcript: list[dict] = []
     start = time.time()
 
     repo = task['repo']
@@ -468,7 +533,7 @@ def run_task(task: dict, condition: str, max_turns: int) -> TaskResult:
         if not clone_repo(repo, task['base_commit'], repo_dir):
             result.error = "clone failed"
             result.duration_seconds = round(time.time() - start, 1)
-            return result
+            return result, saved_transcript
 
         print(f"    setting up venv ...", flush=True)
         python_bin = REPO_PYTHON.get(repo_name, "")
@@ -476,13 +541,13 @@ def run_task(task: dict, condition: str, max_turns: int) -> TaskResult:
         if not python:
             result.error = "venv/install failed"
             result.duration_seconds = round(time.time() - start, 1)
-            return result
+            return result, saved_transcript
 
         print(f"    applying test patch ...", flush=True)
         if not apply_patch(task['test_patch'], repo_dir):
             result.error = "test_patch apply failed"
             result.duration_seconds = round(time.time() - start, 1)
-            return result
+            return result, saved_transcript
 
         # Verify tests fail before Claude runs
         # Build test command for prompts and seed
@@ -525,6 +590,8 @@ def run_task(task: dict, condition: str, max_turns: int) -> TaskResult:
             result.error = claude_out["error"]
 
         cmds = claude_out.get("bash_commands", [])
+        transcript = claude_out.get("transcript", [])
+        saved_transcript = transcript
         result.bash_commands = cmds
         result.total_bash_calls = len(cmds)
         result.tool_call_chars = sum(len(c) for c in cmds)
@@ -532,7 +599,7 @@ def run_task(task: dict, condition: str, max_turns: int) -> TaskResult:
         result.total_input_tokens = claude_out.get("total_input_tokens", 0)
         result.total_output_tokens = claude_out.get("total_output_tokens", 0)
 
-        # Find @{VAR} references in commands (macro condition)
+        # For macro condition, find @{VAR} references in commands
         if condition == "macro":
             found = set()
             for c in cmds:
@@ -546,7 +613,7 @@ def run_task(task: dict, condition: str, max_turns: int) -> TaskResult:
             print(f"    tests FAILED:\n      {test_out[-400:]}")
 
     result.duration_seconds = round(time.time() - start, 1)
-    return result
+    return result, saved_transcript
 
 
 def main():
@@ -575,7 +642,7 @@ def main():
 
         for condition in conditions:
             print(f"\n  -- condition: {condition} --")
-            result = run_task(task, condition, args.max_turns)
+            result, transcript = run_task(task, condition, args.max_turns)
 
             status = "PASS" if result.success else ("ERR:" + (result.error or "?") if result.error else "FAIL")
             print(f"  result: {status} | bash calls: {result.total_bash_calls} | "
@@ -587,6 +654,22 @@ def main():
 
             log_path = LOGS_DIR / f"{task['task_id']}_{condition}.json"
             log_path.write_text(json.dumps(asdict(result), indent=2))
+
+            # Save full transcript for training data synthesis (baseline condition only)
+            if condition == "baseline" and transcript and result.success:
+                tpath = LOGS_DIR / "transcripts" / f"{task['task_id']}_baseline.json"
+                tpath.parent.mkdir(parents=True, exist_ok=True)
+                tpath.write_text(json.dumps({
+                    "task_id": task['task_id'],
+                    "repo": task['repo'],
+                    "version": task.get('version', ''),
+                    "problem_statement": task.get('problem_statement', ''),
+                    "fail_to_pass": task['fail_to_pass'],
+                    "prompt": build_prompt("baseline", task, Path("/PLACEHOLDER"), "pytest"),
+                    "transcript": transcript,
+                    "bash_commands": result.bash_commands,
+                    "success": result.success,
+                }, indent=2))
             all_results.append(result)
 
     # Summary
