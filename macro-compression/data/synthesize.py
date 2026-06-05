@@ -181,7 +181,8 @@ def build_training_example(
     transcript = transcript_data.get("transcript", [])
 
     # Must have passed and have enough calls
-    if not transcript_data.get("success"):
+    if not transcript_data.get("success") and not transcript_data.get("bash_commands"):
+        # Skip only if there's literally nothing to work with
         return None
     bash_calls = [t for t in transcript if t["role"] == "assistant"
                   and any(tc["name"] == "Bash" for tc in t.get("tool_calls", []))]
@@ -331,7 +332,8 @@ def main():
             data = json.loads(fpath.read_text())
             total += 1
 
-            if not data.get("success"):
+            if not data.get("success") and not data.get("bash_commands"):
+                # No commands at all — nothing to rewrite
                 skipped_success += 1
                 continue
 
@@ -365,7 +367,7 @@ def main():
     print(f"Results:")
     print(f"  Total transcripts:     {total}")
     print(f"  Included:              {included}")
-    print(f"  Skipped (failed task): {skipped_success}")
+    print(f"  Skipped (no commands): {skipped_success}")
     print(f"  Skipped (too few calls): {skipped_min_calls}")
     print(f"  Skipped (no repo path):  {skipped_no_path}")
     print(f"  Skipped (too few subs):  {skipped_min_subs}")
