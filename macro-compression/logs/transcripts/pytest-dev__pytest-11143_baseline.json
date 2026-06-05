@@ -1,0 +1,129 @@
+{
+  "task_id": "pytest-dev__pytest-11143",
+  "repo": "pytest-dev/pytest",
+  "version": "8.0",
+  "problem_statement": "Rewrite fails when first expression of file is a number and mistaken as docstring \n<!--\r\nThanks for submitting an issue!\r\n\r\nQuick check-list while reporting bugs:\r\n-->\r\n\r\n- [x] a detailed description of the bug or problem you are having\r\n- [x] output of `pip list` from the virtual environment you are using\r\n- [x] pytest and operating system versions\r\n- [x] minimal example if possible\r\n```\r\nInstall",
+  "fail_to_pass": "[\"testing/test_assertrewrite.py::TestIssue11140::test_constant_not_picked_as_module_docstring\"]",
+  "prompt": "You are fixing a bug in the pytest-dev/pytest repository.\n\nRepository location: /PLACEHOLDER\nProblem: Rewrite fails when first expression of file is a number and mistaken as docstring \n<!--\r\nThanks for submitting an issue!\r\n\r\nQuick check-list while reporting bugs:\r\n-->\r\n\r\n- [x] a detailed description of the bug or problem you are having\r\n- [x] output of `pip list` from the virtual environment you are using\r\n- [x] pytest and operating system versions\r\n- [x] minimal example if possible\r\n```\r\nInstall\n\nThe following tests currently FAIL and must pass after your fix:\ntesting/test_assertrewrite.py::TestIssue11140::test_constant_not_picked_as_module_docstring\n\nTest command: pytest\nNote: add -p no:hypothesispytest to pytest invocations to avoid a stale system plugin interfering with results.\n\nInstructions:\n- Read relevant source files to understand the codebase\n- Make the minimal change needed to fix the problem\n- Run the tests to verify your fix\n- The test files already exist (pre-applied) \u2014 do not create them\n- Work only in /PLACEHOLDER\n",
+  "transcript": [
+    {
+      "role": "assistant",
+      "text": "",
+      "tool_calls": [
+        {
+          "tool_use_id": "toolu_01XRQdvsxMM3Bn7i7uvsmK8v",
+          "name": "Bash",
+          "input": {
+            "command": "cd /var/folders/l5/h6t9hd752xgdz4xqrpg44xp40000gn/T/swe_pytest-dev__pytest-1_6jh729j0/pytest && grep -n \"TestIssue11140\" -A 40 testing/test_assertrewrite.py",
+            "description": "View the failing test"
+          }
+        }
+      ]
+    },
+    {
+      "role": "tool",
+      "tool_use_id": "toolu_01XRQdvsxMM3Bn7i7uvsmK8v",
+      "command": "cd /var/folders/l5/h6t9hd752xgdz4xqrpg44xp40000gn/T/swe_pytest-dev__pytest-1_6jh729j0/pytest && grep -n \"TestIssue11140\" -A 40 testing/test_assertrewrite.py",
+      "output": "2047:class TestIssue11140:\n2048-    def test_constant_not_picked_as_module_docstring(self, pytester: Pytester) -> None:\n2049-        pytester.makepyfile(\n2050-            \"\"\"\\\n2051-            0\n2052-\n2053-            def test_foo():\n2054-                pass\n2055-            \"\"\"\n2056-        )\n2057-        result = pytester.runpytest()\n2058-        assert result.ret == 0",
+      "is_error": false
+    },
+    {
+      "role": "assistant",
+      "text": "",
+      "tool_calls": [
+        {
+          "tool_use_id": "toolu_014C3f11vPha8AYsN6oJeiJD",
+          "name": "Bash",
+          "input": {
+            "command": "cd /var/folders/l5/h6t9hd752xgdz4xqrpg44xp40000gn/T/swe_pytest-dev__pytest-1_6jh729j0/pytest && grep -n \"docstring\\|is_rewrite_disabled\\|expr_stmt\\|body\\[0\\]\\|Str\\|Constant\" src/_pytest/assertion/rewrite.py",
+            "description": "Find docstring handling in rewrite.py"
+          }
+        }
+      ]
+    },
+    {
+      "role": "tool",
+      "tool_use_id": "toolu_014C3f11vPha8AYsN6oJeiJD",
+      "command": "cd /var/folders/l5/h6t9hd752xgdz4xqrpg44xp40000gn/T/swe_pytest-dev__pytest-1_6jh729j0/pytest && grep -n \"docstring\\|is_rewrite_disabled\\|expr_stmt\\|body\\[0\\]\\|Str\\|Constant\" src/_pytest/assertion/rewrite.py",
+      "output": "253:            if not AssertionRewriter.is_rewrite_disabled(\n667:        # docstrings and __future__ imports, so first figure out where that is.\n668:        doc = getattr(mod, \"docstring\", None)\n669:        expect_docstring = doc is None\n670:        if doc is not None and self.is_rewrite_disabled(doc):\n676:                expect_docstring\n678:                and isinstance(item.value, ast.Constant)\n681:                if self.is_rewrite_disabled(doc):\n683:                expect_docstring = False\n745:    def is_rewrite_disabled(docstring: str) -> bool:\n746:        return \"PYTEST_DONT_REWRITE\" in docstring\n812:        keys = [ast.Constant(key) for key in current.keys()]\n866:            msg = self.pop_format_context(ast.Constant(explanation))\n873:                assertmsg = ast.Constant(\"\")\n875:            err_explanation = ast.BinOp(ast.Constant(gluestr), ast.Add(), msg)\n891:                    ast.Constant(assert_.lineno),\n892:                    ast.Constant(orig),\n911:                clear_format = ast.Assign(variables, ast.Constant(None))\n922:                assertmsg = ast.Constant(\"\")\n924:            template = ast.BinOp(assertmsg, ast.Add(), ast.Constant(explanation))\n936:            clear = ast.Assign(variables, ast.Constant(None))\n950:        inlocs = ast.Compare(ast.Constant(target_id), [ast.In()], [locs])\n953:        expr = ast.IfExp(test, self.display(name), ast.Constant(target_id))\n960:        inlocs = ast.Compare(ast.Constant(name.id), [ast.In()], [locs])\n963:        expr = ast.IfExp(test, self.display(name), ast.Constant(name.id))\n1001:            expl_format = self.pop_format_context(ast.Constant(expl))\n1013:        expl_template = self.helper(\"_format_boolop\", expl_list, ast.Constant(is_or))\n1116:            syms.append(ast.Constant(sym))\n1118:            expls.append(ast.Constant(expl))",
+      "is_error": false
+    },
+    {
+      "role": "assistant",
+      "text": "",
+      "tool_calls": [
+        {
+          "tool_use_id": "toolu_01DEtr4x4jiKKTrxrV2jpo6X",
+          "name": "Read",
+          "input": {
+            "file_path": "/var/folders/l5/h6t9hd752xgdz4xqrpg44xp40000gn/T/swe_pytest-dev__pytest-1_6jh729j0/pytest/src/_pytest/assertion/rewrite.py",
+            "offset": 660,
+            "limit": 95
+          }
+        }
+      ]
+    },
+    {
+      "role": "tool",
+      "tool_use_id": "toolu_01DEtr4x4jiKKTrxrV2jpo6X",
+      "command": "",
+      "output": "660\t    def run(self, mod: ast.Module) -> None:\n661\t        \"\"\"Find all assert statements in *mod* and rewrite them.\"\"\"\n662\t        if not mod.body:\n663\t            # Nothing to do.\n664\t            return\n665\t\n666\t        # We'll insert some special imports at the top of the module, but after any\n667\t        # docstrings and __future__ imports, so first figure out where that is.\n668\t        doc = getattr(mod, \"docstring\", None)\n669\t        expect_docstring = doc is None\n670\t        if doc is not None and self.is_rewrite_disabled(doc):\n671\t            return\n672\t        pos = 0\n673\t        item = None\n674\t        for item in mod.body:\n675\t            if (\n676\t                expect_docstring\n677\t                and isinstance(item, ast.Expr)\n678\t                and isinstance(item.value, ast.Constant)\n679\t            ):\n680\t                doc = item.value.value\n681\t                if self.is_rewrite_disabled(doc):\n682\t                    return\n683\t                expect_docstring = False\n684\t            elif (\n685\t                isinstance(item, ast.ImportFrom)\n686\t                and item.level == 0\n687\t                and item.module == \"__future__\"\n688\t            ):\n689\t                pass\n690\t            else:\n691\t                break\n692\t            pos += 1\n693\t        # Special case: for a decorated function, set the lineno to that of the\n694\t        # first decorator, not the `def`. Issue #4984.\n695\t        if isinstance(item, ast.FunctionDef) and item.decorator_list:\n696\t            lineno = item.decorator_list[0].lineno\n697\t        else:\n698\t            lineno = item.lineno\n699\t        # Now actually insert the special imports.\n700\t        if sys.version_info >= (3, 10):\n701\t            aliases = [\n702\t                ast.alias(\"builtins\", \"@py_builtins\", lineno=lineno, col_offset=0),\n703\t                ast.alias(\n704\t                    \"_pytest.assertion.rewrite\",\n705\t                    \"@pytest_ar\",\n706\t                    lineno=lineno,\n707\t                    col_offset=0,\n708\t                ),\n709\t            ]\n710\t        else:\n711\t            aliases = [\n712\t                ast.alias(\"builtins\", \"@py_builtins\"),\n713\t                ast.alias(\"_pytest.assertion.rewrite\", \"@pytest_ar\"),\n714\t            ]\n715\t        imports = [\n716\t            ast.Import([alias], lineno=lineno, col_offset=0) for alias in aliases\n717\t        ]\n718\t        mod.body[pos:pos] = imports\n719\t\n720\t        # Collect asserts.\n721\t        nodes: List[ast.AST] = [mod]\n722\t        while nodes:\n723\t            node = nodes.pop()\n724\t            for name, field in ast.iter_fields(node):\n725\t                if isinstance(field, list):\n726\t                    new: List[ast.AST] = []\n727\t                    for i, child in enumerate(field):\n728\t                        if isinstance(child, ast.Assert):\n729\t                            # Transform assert.\n730\t                            new.extend(self.visit(child))\n731\t                        else:\n732\t                            new.append(child)\n733\t                            if isinstance(child, ast.AST):\n734\t                                nodes.append(child)\n735\t                    setattr(node, name, new)\n736\t                elif (\n737\t                    isinstance(field, ast.AST)\n738\t                    # Don't recurse into expressions as they can't contain\n739\t                    # asserts.\n740\t                    and not isinstance(field, ast.expr)\n741\t                ):\n742\t                    nodes.append(field)\n743\t\n744\t    @staticmethod\n745\t    def is_rewrite_disabled(docstring: str) -> bool:\n746\t        return \"PYTEST_DONT_REWRITE\" in docstring\n747\t\n748\t    def variable(self) -> str:\n749\t        \"\"\"Get a new variable.\"\"\"\n750\t        # Use a character invalid in python identifiers to avoid clashing.\n751\t        name = \"@py_assert\" + str(next(self.variable_counter))\n752\t        self.variables.append(name)\n753\t        return name\n754\t",
+      "is_error": false
+    },
+    {
+      "role": "assistant",
+      "text": "",
+      "tool_calls": [
+        {
+          "tool_use_id": "toolu_0199waC854XWCgyYsZbBmxRU",
+          "name": "Edit",
+          "input": {
+            "replace_all": false,
+            "file_path": "/var/folders/l5/h6t9hd752xgdz4xqrpg44xp40000gn/T/swe_pytest-dev__pytest-1_6jh729j0/pytest/src/_pytest/assertion/rewrite.py",
+            "old_string": "                expect_docstring\n                and isinstance(item, ast.Expr)\n                and isinstance(item.value, ast.Constant)\n            ):\n                doc = item.value.value",
+            "new_string": "                expect_docstring\n                and isinstance(item, ast.Expr)\n                and isinstance(item.value, ast.Constant)\n                and isinstance(item.value.value, str)\n            ):\n                doc = item.value.value"
+          }
+        }
+      ]
+    },
+    {
+      "role": "tool",
+      "tool_use_id": "toolu_0199waC854XWCgyYsZbBmxRU",
+      "command": "",
+      "output": "The file /var/folders/l5/h6t9hd752xgdz4xqrpg44xp40000gn/T/swe_pytest-dev__pytest-1_6jh729j0/pytest/src/_pytest/assertion/rewrite.py has been updated successfully. (file state is current in your context \u2014 no need to Read it back)",
+      "is_error": false
+    },
+    {
+      "role": "assistant",
+      "text": "",
+      "tool_calls": [
+        {
+          "tool_use_id": "toolu_01LxYTySxJR6gx1H1MfeEEnz",
+          "name": "Bash",
+          "input": {
+            "command": "cd /var/folders/l5/h6t9hd752xgdz4xqrpg44xp40000gn/T/swe_pytest-dev__pytest-1_6jh729j0/pytest && .venv/bin/pytest testing/test_assertrewrite.py::TestIssue11140::test_constant_not_picked_as_module_docstring -x -q -p no:hypothesispytest",
+            "description": "Run failing test"
+          }
+        }
+      ]
+    },
+    {
+      "role": "tool",
+      "tool_use_id": "toolu_01LxYTySxJR6gx1H1MfeEEnz",
+      "command": "cd /var/folders/l5/h6t9hd752xgdz4xqrpg44xp40000gn/T/swe_pytest-dev__pytest-1_6jh729j0/pytest && .venv/bin/pytest testing/test_assertrewrite.py::TestIssue11140::test_constant_not_picked_as_module_docstring -x -q -p no:hypothesispytest",
+      "output": ".                                                                        [100%]\n1 passed in 0.08s",
+      "is_error": false
+    },
+    {
+      "role": "assistant",
+      "text": "The test passes. The fix adds an `isinstance(item.value.value, str)` check so that a leading non-string constant (like `0`) isn't mistaken for a docstring \u2014 which previously caused `\"PYTEST_DONT_REWRITE\" in 0` to raise a `TypeError`.",
+      "tool_calls": []
+    }
+  ],
+  "bash_commands": [
+    "cd /var/folders/l5/h6t9hd752xgdz4xqrpg44xp40000gn/T/swe_pytest-dev__pytest-1_6jh729j0/pytest && grep -n \"TestIssue11140\" -A 40 testing/test_assertrewrite.py",
+    "cd /var/folders/l5/h6t9hd752xgdz4xqrpg44xp40000gn/T/swe_pytest-dev__pytest-1_6jh729j0/pytest && grep -n \"docstring\\|is_rewrite_disabled\\|expr_stmt\\|body\\[0\\]\\|Str\\|Constant\" src/_pytest/assertion/rewrite.py",
+    "cd /var/folders/l5/h6t9hd752xgdz4xqrpg44xp40000gn/T/swe_pytest-dev__pytest-1_6jh729j0/pytest && .venv/bin/pytest testing/test_assertrewrite.py::TestIssue11140::test_constant_not_picked_as_module_docstring -x -q -p no:hypothesispytest"
+  ],
+  "success": true
+}

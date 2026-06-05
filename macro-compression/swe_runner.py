@@ -229,7 +229,7 @@ def run_tests(test_ids: list[str], repo_dir: Path, python: Path, extra_flags: li
         base_cmd = [str(pytest_bin)]
     cmd = base_cmd + test_ids + ["-x", "--tb=short", "-q"] + (extra_flags or [])
     r = subprocess.run(
-        cmd, capture_output=True, text=True, timeout=120, cwd=str(repo_dir),
+        cmd, capture_output=True, text=True, timeout=180, cwd=str(repo_dir),
     )
     return r.returncode == 0, (r.stdout + r.stderr)[-2000:]
 
@@ -468,15 +468,18 @@ def parse_stream_json(stdout: str, stderr: str) -> dict:
                     tool_id = block.get("tool_use_id", "")
                     result_content = block.get("content", "")
                     if isinstance(result_content, list):
-                        # Sometimes content is a list of text blocks
                         result_content = " ".join(
                             b.get("text", "") for b in result_content if isinstance(b, dict)
                         )
                     is_error = block.get("is_error", False)
-                    # Also pull from tool_use_result if present (Claude Code specific)
-                    tool_result = evt.get("tool_use_result", {})
-                    stdout_out = tool_result.get("stdout", result_content)
-                    stderr_out = tool_result.get("stderr", "")
+                    # Claude Code stream-json puts tool_use_result at the event top level
+                    tool_result_meta = evt.get("tool_use_result", {})
+                    if isinstance(tool_result_meta, dict):
+                        stdout_out = tool_result_meta.get("stdout", result_content)
+                        stderr_out = tool_result_meta.get("stderr", "")
+                    else:
+                        stdout_out = result_content
+                        stderr_out = ""
                     output = stdout_out
                     if stderr_out:
                         output = (output + "\n" + stderr_out).strip()
@@ -655,8 +658,9 @@ def main():
             log_path = LOGS_DIR / f"{task['task_id']}_{condition}.json"
             log_path.write_text(json.dumps(asdict(result), indent=2))
 
-            # Save full transcript for training data synthesis (baseline condition only)
-            if condition == "baseline" and transcript and result.success:
+            # Save full transcript for training data synthesis (baseline condition)
+            # Save regardless of success — synthesize.py filters on success field
+            if condition == "baseline" and transcript:
                 tpath = LOGS_DIR / "transcripts" / f"{task['task_id']}_baseline.json"
                 tpath.parent.mkdir(parents=True, exist_ok=True)
                 tpath.write_text(json.dumps({

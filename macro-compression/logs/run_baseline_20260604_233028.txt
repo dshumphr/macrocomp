@@ -1,0 +1,119 @@
+
+============================================================
+Task: psf__requests-2148
+Tests: ['test_requests.py::RequestsTestCase::test_DIGEST_AUTH_RETURNS_COOKIE', 'test_requests.py::RequestsTestCase::test_HTTP_200_OK_GET_ALTERNATIVE', 'test_requests.py::RequestsTestCase::test_HTTP_200_OK_HEAD', 'test_requests.py::RequestsTestCase::test_POSTBIN_GET_POST_FILES', 'test_requests.py::RequestsTestCase::test_auth_is_stripped_on_redirect_off_host', 'test_requests.py::RequestsTestCase::test_basicauth_with_netrc', 'test_requests.py::RequestsTestCase::test_cookie_quote_wrapped', 'test_requests.py::RequestsTestCase::test_generic_cookiejar_works', 'test_requests.py::RequestsTestCase::test_iter_content_handles_socket_error', 'test_requests.py::RequestsTestCase::test_unicode_multipart_post']
+
+  -- condition: baseline --
+    cloning psf/requests @ fe693c49 ...
+    setting up venv ...
+    applying test patch ...
+    running Claude (baseline) ...
+    tests FAILED:
+      if isinstance(hook, collections.Callable):
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ============================
+FAILED test_requests.py::RequestsTestCase::test_cookie_quote_wrapped - KeyErr...
+!!!!!!!!!!!!!!!!!!!!!!!!!! stopping after 1 failures !!!!!!!!!!!!!!!!!!!!!!!!!!!
+1 failed, 6 passed, 3 warnings in 11.67s
+
+  result: FAIL | bash calls: 9 | cmd chars: 2297 (~574 tok) | total input tok: 1972 | 243.8s
+
+============================================================
+Task: psf__requests-2317
+Tests: ['test_requests.py::RequestsTestCase::test_HTTP_302_ALLOW_REDIRECT_GET', 'test_requests.py::RequestsTestCase::test_POSTBIN_GET_POST_FILES', 'test_requests.py::RequestsTestCase::test_POSTBIN_GET_POST_FILES_WITH_DATA', 'test_requests.py::RequestsTestCase::test_basicauth_with_netrc', 'test_requests.py::RequestsTestCase::test_json_param_post_content_type_works', 'test_requests.py::RequestsTestCase::test_manual_redirect_with_partial_body_read', 'test_requests.py::RequestsTestCase::test_requests_history_is_saved', 'test_requests.py::TestTimeout::test_encoded_methods']
+
+  -- condition: baseline --
+    cloning psf/requests @ 091991be ...
+    setting up venv ...
+    applying test patch ...
+    running Claude (baseline) ...
+    tests FAILED:
+       if isinstance(hook, collections.Callable):
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ============================
+FAILED test_requests.py::RequestsTestCase::test_POSTBIN_GET_POST_FILES - requ...
+!!!!!!!!!!!!!!!!!!!!!!!!!! stopping after 1 failures !!!!!!!!!!!!!!!!!!!!!!!!!!!
+1 failed, 1 passed, 3 warnings in 5.84s
+
+  result: FAIL | bash calls: 10 | cmd chars: 3341 (~835 tok) | total input tok: 1966 | 266.0s
+
+============================================================
+Task: psf__requests-1963
+Tests: ['test_requests.py::RequestsTestCase::test_DIGESTAUTH_QUOTES_QOP_VALUE', 'test_requests.py::RequestsTestCase::test_DIGESTAUTH_WRONG_HTTP_401_GET', 'test_requests.py::RequestsTestCase::test_DIGEST_AUTH_RETURNS_COOKIE', 'test_requests.py::RequestsTestCase::test_DIGEST_HTTP_200_OK_GET', 'test_requests.py::RequestsTestCase::test_POSTBIN_GET_POST_FILES_WITH_DATA', 'test_requests.py::RequestsTestCase::test_param_cookiejar_works', 'test_requests.py::TestRedirects::test_requests_are_updated_each_time']
+
+  -- condition: baseline --
+    cloning psf/requests @ 110048f9 ...
+    setting up venv ...
+    applying test patch ...
+    running Claude (baseline) ...
+    tests FAILED:
+         if isinstance(hook, collections.Callable):
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ============================
+FAILED test_requests.py::RequestsTestCase::test_DIGESTAUTH_WRONG_HTTP_401_GET
+!!!!!!!!!!!!!!!!!!!!!!!!!! stopping after 1 failures !!!!!!!!!!!!!!!!!!!!!!!!!!!
+1 failed, 1 passed, 3 warnings in 11.87s
+
+  result: FAIL | bash calls: 13 | cmd chars: 4639 (~1159 tok) | total input tok: 2105 | 426.1s
+
+============================================================
+Task: pallets__flask-4045
+Tests: ['tests/test_blueprints.py::test_dotted_name_not_allowed', 'tests/test_blueprints.py::test_route_decorator_custom_endpoint_with_dots']
+
+  -- condition: baseline --
+    cloning pallets/flask @ d8c37f43 ...
+    setting up venv ...
+    applying test patch ...
+    running Claude (baseline) ...
+  result: PASS | bash calls: 5 | cmd chars: 1138 (~284 tok) | total input tok: 1962 | 54.5s
+
+============================================================
+Task: pallets__flask-5063
+Tests: ['tests/test_cli.py::TestRoutes::test_subdomain', 'tests/test_cli.py::TestRoutes::test_host']
+
+  -- condition: baseline --
+    cloning pallets/flask @ 182ce3dd ...
+    setting up venv ...
+    applying test patch ...
+    running Claude (baseline) ...
+  result: PASS | bash calls: 3 | cmd chars: 501 (~125 tok) | total input tok: 1821 | 39.7s
+
+============================================================
+Task: pytest-dev__pytest-11148
+Tests: ['testing/test_pathlib.py::TestImportPath::test_remembers_previous_imports', 'testing/acceptance_test.py::test_doctest_and_normal_imports_with_importlib']
+
+  -- condition: baseline --
+    cloning pytest-dev/pytest @ 2f7415cf ...
+    setting up venv ...
+    applying test patch ...
+    running Claude (baseline) ...
+  result: PASS | bash calls: 5 | cmd chars: 1041 (~260 tok) | total input tok: 1954 | 37.0s
+
+============================================================
+Task: pallets__flask-4992
+Tests: ['tests/test_config.py::test_config_from_file_toml']
+
+  -- condition: baseline --
+    cloning pallets/flask @ 4c288bc9 ...
+    setting up venv ...
+    applying test patch ...
+    running Claude (baseline) ...
+  result: PASS | bash calls: 12 | cmd chars: 2050 (~512 tok) | total input tok: 1966 | 99.4s
+
+============================================================
+Task: pytest-dev__pytest-11143
+Tests: ['testing/test_assertrewrite.py::TestIssue11140::test_constant_not_picked_as_module_docstring']
+
+  -- condition: baseline --
+    cloning pytest-dev/pytest @ 6995257c ...
+    setting up venv ...
+    applying test patch ...
+    running Claude (baseline) ...
+  result: PASS | bash calls: 3 | cmd chars: 595 (~148 tok) | total input tok: 1821 | 30.0s
+
+============================================================
+SUMMARY
+============================================================

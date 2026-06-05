@@ -1,0 +1,188 @@
+{
+  "task_id": "pytest-dev__pytest-11148",
+  "repo": "pytest-dev/pytest",
+  "version": "8.0",
+  "problem_statement": "Module imported twice under import-mode=importlib\nIn pmxbot/pmxbot@7f189ad, I'm attempting to switch pmxbot off of pkg_resources style namespace packaging to PEP 420 namespace packages. To do so, I've needed to switch to `importlib` for the `import-mode` and re-organize the tests to avoid import errors on the tests.\r\n\r\nYet even after working around these issues, the tests are failing when the effe",
+  "fail_to_pass": "[\"testing/test_pathlib.py::TestImportPath::test_remembers_previous_imports\", \"testing/acceptance_test.py::test_doctest_and_normal_imports_with_importlib\"]",
+  "prompt": "You are fixing a bug in the pytest-dev/pytest repository.\n\nRepository location: /PLACEHOLDER\nProblem: Module imported twice under import-mode=importlib\nIn pmxbot/pmxbot@7f189ad, I'm attempting to switch pmxbot off of pkg_resources style namespace packaging to PEP 420 namespace packages. To do so, I've needed to switch to `importlib` for the `import-mode` and re-organize the tests to avoid import errors on the tests.\r\n\r\nYet even after working around these issues, the tests are failing when the effe\n\nThe following tests currently FAIL and must pass after your fix:\ntesting/test_pathlib.py::TestImportPath::test_remembers_previous_imports\ntesting/acceptance_test.py::test_doctest_and_normal_imports_with_importlib\n\nTest command: pytest\nNote: add -p no:hypothesispytest to pytest invocations to avoid a stale system plugin interfering with results.\n\nInstructions:\n- Read relevant source files to understand the codebase\n- Make the minimal change needed to fix the problem\n- Run the tests to verify your fix\n- The test files already exist (pre-applied) \u2014 do not create them\n- Work only in /PLACEHOLDER\n",
+  "transcript": [
+    {
+      "role": "assistant",
+      "text": "",
+      "tool_calls": [
+        {
+          "tool_use_id": "toolu_016WaLnrW3n5htvAse2cGMBx",
+          "name": "Bash",
+          "input": {
+            "command": "cd /var/folders/l5/h6t9hd752xgdz4xqrpg44xp40000gn/T/swe_pytest-dev__pytest-1_qpuzm1xn/pytest && git diff testing/test_pathlib.py testing/acceptance_test.py",
+            "description": "Show the pre-applied test changes"
+          }
+        }
+      ]
+    },
+    {
+      "role": "tool",
+      "tool_use_id": "toolu_016WaLnrW3n5htvAse2cGMBx",
+      "command": "cd /var/folders/l5/h6t9hd752xgdz4xqrpg44xp40000gn/T/swe_pytest-dev__pytest-1_qpuzm1xn/pytest && git diff testing/test_pathlib.py testing/acceptance_test.py",
+      "output": "diff --git a/testing/acceptance_test.py b/testing/acceptance_test.py\nindex 453e26972..429fb4e43 100644\n--- a/testing/acceptance_test.py\n+++ b/testing/acceptance_test.py\n@@ -1315,3 +1315,38 @@ def test_function_return_non_none_warning(pytester: Pytester) -> None:\n     )\n     res = pytester.runpytest()\n     res.stdout.fnmatch_lines([\"*Did you mean to use `assert` instead of `return`?*\"])\n+\n+\n+def test_doctest_and_normal_imports_with_importlib(pytester: Pytester) -> None:\n+    \"\"\"\n+    Regression test for #10811: previously import_path with ImportMode.importlib would\n+    not return a module if already in sys.modules, resulting in modules being imported\n+    multiple times, which causes problems with modules that have import side effects.\n+    \"\"\"\n+    # Uses the exact reproducer form #10811, given it is very minimal\n+    # and illustrates the problem well.\n+    pytester.makepyfile(\n+        **{\n+            \"pmxbot/commands.py\": \"from . import logging\",\n+            \"pmxbot/logging.py\": \"\",\n+            \"tests/__init__.py\": \"\",\n+            \"tests/test_commands.py\": \"\"\"\n+                import importlib\n+                from pmxbot import logging\n+\n+                class TestCommands:\n+                    def test_boo(self):\n+                        assert importlib.import_module('pmxbot.logging') is logging\n+                \"\"\",\n+        }\n+    )\n+    pytester.makeini(\n+        \"\"\"\n+        [pytest]\n+        addopts=\n+            --doctest-modules\n+            --import-mode importlib\n+        \"\"\"\n+    )\n+    result = pytester.runpytest_subprocess()\n+    result.stdout.fnmatch_lines(\"*1 passed*\")\ndiff --git a/testing/test_pathlib.py b/testing/test_pathlib.py\nindex c15a81ea1..3d574e856 100644\n--- a/testing/test_pathlib.py\n+++ b/testing/test_pathlib.py\n@@ -7,6 +7,7 @@ from textwrap import dedent\n from types import ModuleType\n from typing import Any\n from typing import Generator\n+from typing import Iterator\n \n import pytest\n from _pytest.monkeypatch import MonkeyPatch\n@@ -282,29 +283,36 @@ class TestImportPath:\n             import_path(tmp_path / \"invalid.py\", root=tmp_path)\n \n     @pytest.fixture\n-    def simple_module(self, tmp_path: Path) -> Path:\n-        fn = tmp_path / \"_src/tests/mymod.py\"\n+    def simple_module(\n+        self, tmp_path: Path, request: pytest.FixtureRequest\n+    ) -> Iterator[Path]:\n+        name = f\"mymod_{request.node.name}\"\n+        fn = tmp_path / f\"_src/tests/{name}.py\"\n         fn.parent.mkdir(parents=True)\n         fn.write_text(\"def foo(x): return 40 + x\", encoding=\"utf-8\")\n-        return fn\n+        module_name = module_name_from_path(fn, root=tmp_path)\n+        yield fn\n+        sys.modules.pop(module_name, None)\n \n-    def test_importmode_importlib(self, simple_module: Path, tmp_path: Path) -> None:\n+    def test_importmode_importlib(\n+        self, simple_module: Path, tmp_path: Path, request: pytest.FixtureRequest\n+    ) -> None:\n         \"\"\"`importlib` mode does not change sys.path.\"\"\"\n         module = import_path(simple_module, mode=\"importlib\", root=tmp_path)\n         assert module.foo(2) == 42  # type: ignore[attr-defined]\n         assert str(simple_module.parent) not in sys.path\n         assert module.__name__ in sys.modules\n-        assert module.__name__ == \"_src.tests.mymod\"\n+        assert module.__name__ == f\"_src.tests.mymod_{request.node.name}\"\n         assert \"_src\" in sys.modules\n         assert \"_src.tests\" in sys.modules\n \n-    def test_importmode_twice_is_different_module(\n+    def test_remembers_previous_imports(\n         self, simple_module: Path, tmp_path: Path\n     ) -> None:\n-        \"\"\"`importlib` mode always returns a new module.\"\"\"\n+        \"\"\"`importlib` mode called remembers previous module (#10341, #10811).\"\"\"\n         module1 = import_path(simple_module, mode=\"importlib\", root=tmp_path)\n         module2 = import_path(simple_module, mode=\"importlib\", root=tmp_path)\n-        assert module1 is not module2\n+        assert module1 is module2\n \n     def test_no_meta_path_",
+      "is_error": false
+    },
+    {
+      "role": "assistant",
+      "text": "",
+      "tool_calls": [
+        {
+          "tool_use_id": "toolu_01AK9v6fdFYKpgE5nNcxsKH6",
+          "name": "Bash",
+          "input": {
+            "command": "cd /var/folders/l5/h6t9hd752xgdz4xqrpg44xp40000gn/T/swe_pytest-dev__pytest-1_qpuzm1xn/pytest && grep -n \"importlib\\|insert_missing_modules\\|def import_path\\|sys.modules\\|spec_from_file_location\\|module_from_spec\" src/_pytest/pathlib.py",
+            "description": "Find importlib handling in pathlib.py"
+          }
+        }
+      ]
+    },
+    {
+      "role": "tool",
+      "tool_use_id": "toolu_01AK9v6fdFYKpgE5nNcxsKH6",
+      "command": "cd /var/folders/l5/h6t9hd752xgdz4xqrpg44xp40000gn/T/swe_pytest-dev__pytest-1_qpuzm1xn/pytest && grep -n \"importlib\\|insert_missing_modules\\|def import_path\\|sys.modules\\|spec_from_file_location\\|module_from_spec\" src/_pytest/pathlib.py",
+      "output": "4:import importlib.util\n474:    importlib = \"importlib\"\n486:def import_path(\n499:      being imported with `importlib.import_module`.\n504:    * `mode == ImportMode.importlib`: uses more fine control mechanisms provided by `importlib`\n509:        Used as an anchor when mode == ImportMode.importlib to obtain\n511:        into ``sys.modules``.\n524:    if mode is ImportMode.importlib:\n532:            spec = importlib.util.spec_from_file_location(module_name, str(path))\n536:        mod = importlib.util.module_from_spec(spec)\n537:        sys.modules[module_name] = mod\n539:        insert_missing_modules(sys.modules, module_name)\n565:    importlib.import_module(module_name)\n567:    mod = sys.modules[module_name]\n627:def insert_missing_modules(modules: Dict[str, ModuleType], module_name: str) -> None:\n629:    Used by ``import_path`` to create intermediate modules when using mode=importlib.\n648:                module = importlib.import_module(module_name)\n652:                    doc=\"Empty module created by pytest's importmode=importlib.\",",
+      "is_error": false
+    },
+    {
+      "role": "assistant",
+      "text": "",
+      "tool_calls": [
+        {
+          "tool_use_id": "toolu_012NfFDoT9KTz8BeQZ41qPKg",
+          "name": "Read",
+          "input": {
+            "file_path": "/var/folders/l5/h6t9hd752xgdz4xqrpg44xp40000gn/T/swe_pytest-dev__pytest-1_qpuzm1xn/pytest/src/_pytest/pathlib.py",
+            "offset": 520,
+            "limit": 50
+          }
+        }
+      ]
+    },
+    {
+      "role": "tool",
+      "tool_use_id": "toolu_012NfFDoT9KTz8BeQZ41qPKg",
+      "command": "",
+      "output": "520\t\n521\t    if not path.exists():\n522\t        raise ImportError(path)\n523\t\n524\t    if mode is ImportMode.importlib:\n525\t        module_name = module_name_from_path(path, root)\n526\t\n527\t        for meta_importer in sys.meta_path:\n528\t            spec = meta_importer.find_spec(module_name, [str(path.parent)])\n529\t            if spec is not None:\n530\t                break\n531\t        else:\n532\t            spec = importlib.util.spec_from_file_location(module_name, str(path))\n533\t\n534\t        if spec is None:\n535\t            raise ImportError(f\"Can't find module {module_name} at location {path}\")\n536\t        mod = importlib.util.module_from_spec(spec)\n537\t        sys.modules[module_name] = mod\n538\t        spec.loader.exec_module(mod)  # type: ignore[union-attr]\n539\t        insert_missing_modules(sys.modules, module_name)\n540\t        return mod\n541\t\n542\t    pkg_path = resolve_package_path(path)\n543\t    if pkg_path is not None:\n544\t        pkg_root = pkg_path.parent\n545\t        names = list(path.with_suffix(\"\").relative_to(pkg_root).parts)\n546\t        if names[-1] == \"__init__\":\n547\t            names.pop()\n548\t        module_name = \".\".join(names)\n549\t    else:\n550\t        pkg_root = path.parent\n551\t        module_name = path.stem\n552\t\n553\t    # Change sys.path permanently: restoring it at the end of this function would cause surprising\n554\t    # problems because of delayed imports: for example, a conftest.py file imported by this function\n555\t    # might have local imports, which would fail at runtime if we restored sys.path.\n556\t    if mode is ImportMode.append:\n557\t        if str(pkg_root) not in sys.path:\n558\t            sys.path.append(str(pkg_root))\n559\t    elif mode is ImportMode.prepend:\n560\t        if str(pkg_root) != sys.path[0]:\n561\t            sys.path.insert(0, str(pkg_root))\n562\t    else:\n563\t        assert_never(mode)\n564\t\n565\t    importlib.import_module(module_name)\n566\t\n567\t    mod = sys.modules[module_name]\n568\t    if path.name == \"__init__.py\":\n569\t        return mod",
+      "is_error": false
+    },
+    {
+      "role": "assistant",
+      "text": "Now I understand. The fix is to check `sys.modules` first before re-importing:",
+      "tool_calls": []
+    },
+    {
+      "role": "assistant",
+      "text": "",
+      "tool_calls": [
+        {
+          "tool_use_id": "toolu_01CQvHnYDTNZseY3HY18Q8Jg",
+          "name": "Edit",
+          "input": {
+            "replace_all": false,
+            "file_path": "/var/folders/l5/h6t9hd752xgdz4xqrpg44xp40000gn/T/swe_pytest-dev__pytest-1_qpuzm1xn/pytest/src/_pytest/pathlib.py",
+            "old_string": "    if mode is ImportMode.importlib:\n        module_name = module_name_from_path(path, root)\n\n        for meta_importer in sys.meta_path:",
+            "new_string": "    if mode is ImportMode.importlib:\n        module_name = module_name_from_path(path, root)\n        with contextlib.suppress(KeyError):\n            return sys.modules[module_name]\n\n        for meta_importer in sys.meta_path:"
+          }
+        }
+      ]
+    },
+    {
+      "role": "tool",
+      "tool_use_id": "toolu_01CQvHnYDTNZseY3HY18Q8Jg",
+      "command": "",
+      "output": "The file /var/folders/l5/h6t9hd752xgdz4xqrpg44xp40000gn/T/swe_pytest-dev__pytest-1_qpuzm1xn/pytest/src/_pytest/pathlib.py has been updated successfully. (file state is current in your context \u2014 no need to Read it back)",
+      "is_error": false
+    },
+    {
+      "role": "assistant",
+      "text": "",
+      "tool_calls": [
+        {
+          "tool_use_id": "toolu_01WBCkNFnPquNg94BJtpLqet",
+          "name": "Bash",
+          "input": {
+            "command": "cd /var/folders/l5/h6t9hd752xgdz4xqrpg44xp40000gn/T/swe_pytest-dev__pytest-1_qpuzm1xn/pytest && grep -n \"^import contextlib\\|^import \" src/_pytest/pathlib.py | head -20",
+            "description": "Check for contextlib import"
+          }
+        }
+      ]
+    },
+    {
+      "role": "tool",
+      "tool_use_id": "toolu_01WBCkNFnPquNg94BJtpLqet",
+      "command": "cd /var/folders/l5/h6t9hd752xgdz4xqrpg44xp40000gn/T/swe_pytest-dev__pytest-1_qpuzm1xn/pytest && grep -n \"^import contextlib\\|^import \" src/_pytest/pathlib.py | head -20",
+      "output": "1:import atexit\n2:import contextlib\n3:import fnmatch\n4:import importlib.util\n5:import itertools\n6:import os\n7:import shutil\n8:import sys\n9:import types\n10:import uuid\n11:import warnings",
+      "is_error": false
+    },
+    {
+      "role": "assistant",
+      "text": "contextlib is already imported. Now let me run the tests:",
+      "tool_calls": []
+    },
+    {
+      "role": "assistant",
+      "text": "",
+      "tool_calls": [
+        {
+          "tool_use_id": "toolu_01Y16qK1fQegsRMGdzjFY7zF",
+          "name": "Bash",
+          "input": {
+            "command": "cd /var/folders/l5/h6t9hd752xgdz4xqrpg44xp40000gn/T/swe_pytest-dev__pytest-1_qpuzm1xn/pytest && .venv/bin/pytest testing/test_pathlib.py::TestImportPath::test_remembers_previous_imports testing/acceptance_test.py::test_doctest_and_normal_imports_with_importlib -x -q -p no:hypothesispytest 2>&1 | tail -20",
+            "description": "Run the failing tests"
+          }
+        }
+      ]
+    },
+    {
+      "role": "tool",
+      "tool_use_id": "toolu_01Y16qK1fQegsRMGdzjFY7zF",
+      "command": "cd /var/folders/l5/h6t9hd752xgdz4xqrpg44xp40000gn/T/swe_pytest-dev__pytest-1_qpuzm1xn/pytest && .venv/bin/pytest testing/test_pathlib.py::TestImportPath::test_remembers_previous_imports testing/acceptance_test.py::test_doctest_and_normal_imports_with_importlib -x -q -p no:hypothesispytest 2>&1 | tail -20",
+      "output": "..                                                                       [100%]\n2 passed in 0.10s",
+      "is_error": false
+    },
+    {
+      "role": "assistant",
+      "text": "Both tests pass. Let me make sure I didn't break the broader pathlib/import test suite:",
+      "tool_calls": []
+    },
+    {
+      "role": "assistant",
+      "text": "",
+      "tool_calls": [
+        {
+          "tool_use_id": "toolu_01NAA1uswAkeJ264YGAQyeMN",
+          "name": "Bash",
+          "input": {
+            "command": "cd /var/folders/l5/h6t9hd752xgdz4xqrpg44xp40000gn/T/swe_pytest-dev__pytest-1_qpuzm1xn/pytest && .venv/bin/pytest testing/test_pathlib.py -q -p no:hypothesispytest 2>&1 | tail -15",
+            "description": "Run full pathlib test suite"
+          }
+        }
+      ]
+    },
+    {
+      "role": "tool",
+      "tool_use_id": "toolu_01NAA1uswAkeJ264YGAQyeMN",
+      "command": "cd /var/folders/l5/h6t9hd752xgdz4xqrpg44xp40000gn/T/swe_pytest-dev__pytest-1_qpuzm1xn/pytest && .venv/bin/pytest testing/test_pathlib.py -q -p no:hypothesispytest 2>&1 | tail -15",
+      "output": ".............................................s......                     [100%]\n51 passed, 1 skipped in 0.04s",
+      "is_error": false
+    },
+    {
+      "role": "assistant",
+      "text": "The fix is complete and verified.\n\n## Summary\n\nThe bug: under `--import-mode=importlib`, `import_path()` in `src/_pytest/pathlib.py` always created and executed a fresh module via `importlib.util.module_from_spec` + `exec_module`, even when that module was already present in `sys.modules`. This caused modules with import side effects to be imported twice (e.g. pmxbot's `pmxbot.logging` loaded once normally and again by `--doctest-modules`), so identity checks like `importlib.import_module('pmxbot.logging') is logging` failed.\n\nThe fix: before re-importing, return the already-imported module from `sys.modules` if present.\n\n```python\nif mode is ImportMode.importlib:\n    module_name = module_name_from_path(path, root)\n    with contextlib.suppress(KeyError):\n        return sys.modules[module_name]\n\n    for meta_importer in sys.meta_path:\n        ...\n```\n\n`contextlib` was already imported. Both target tests pass, and the full `test_pathlib.py` suite (51 passed, 1 skipped) remains green.",
+      "tool_calls": []
+    }
+  ],
+  "bash_commands": [
+    "cd /var/folders/l5/h6t9hd752xgdz4xqrpg44xp40000gn/T/swe_pytest-dev__pytest-1_qpuzm1xn/pytest && git diff testing/test_pathlib.py testing/acceptance_test.py",
+    "cd /var/folders/l5/h6t9hd752xgdz4xqrpg44xp40000gn/T/swe_pytest-dev__pytest-1_qpuzm1xn/pytest && grep -n \"importlib\\|insert_missing_modules\\|def import_path\\|sys.modules\\|spec_from_file_location\\|module_from_spec\" src/_pytest/pathlib.py",
+    "cd /var/folders/l5/h6t9hd752xgdz4xqrpg44xp40000gn/T/swe_pytest-dev__pytest-1_qpuzm1xn/pytest && grep -n \"^import contextlib\\|^import \" src/_pytest/pathlib.py | head -20",
+    "cd /var/folders/l5/h6t9hd752xgdz4xqrpg44xp40000gn/T/swe_pytest-dev__pytest-1_qpuzm1xn/pytest && .venv/bin/pytest testing/test_pathlib.py::TestImportPath::test_remembers_previous_imports testing/acceptance_test.py::test_doctest_and_normal_imports_with_importlib -x -q -p no:hypothesispytest 2>&1 | tail -20",
+    "cd /var/folders/l5/h6t9hd752xgdz4xqrpg44xp40000gn/T/swe_pytest-dev__pytest-1_qpuzm1xn/pytest && .venv/bin/pytest testing/test_pathlib.py -q -p no:hypothesispytest 2>&1 | tail -15"
+  ],
+  "success": true
+}
