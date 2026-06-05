@@ -66,13 +66,28 @@ GITHUB_URLS = {
     "pytest-dev/pytest": "https://github.com/pytest-dev/pytest.git",
     "psf/requests": "https://github.com/psf/requests.git",
     "sympy/sympy": "https://github.com/sympy/sympy.git",
+    "django/django": "https://github.com/django/django.git",
+    "sphinx-doc/sphinx": "https://github.com/sphinx-doc/sphinx.git",
+    "pylint-dev/pylint": "https://github.com/pylint-dev/pylint.git",
+    "pydata/xarray": "https://github.com/pydata/xarray.git",
 }
 
 INSTALL_EXTRAS = {
     "flask": [".[dev]"],
     "pytest": [".[testing]"],
-    "requests": [".[security]", "pytest", "pytest-mock"],
+    "requests": ["-e", ".", "pytest", "pytest-mock", "pytest-timeout"],
     "sympy": ["."],
+    "django": [".", "pytest", "pytest-django"],
+    "sphinx": ["setuptools", ".[test]"],
+    "pylint": ["-e", ".[dev,testutils]", "pytest"],
+}
+
+# Per-repo Python version overrides.
+REPO_PYTHON = {
+    "requests": "/Users/danielhumphries/.local/share/uv/python/cpython-3.9-macos-aarch64-none/bin/python3.9",
+    "django": "/opt/homebrew/bin/python3.12",
+    "sphinx": "/opt/homebrew/bin/python3.11",
+    "pylint": "/Users/danielhumphries/.local/share/uv/python/cpython-3.11-macos-aarch64-none/bin/python3.11",
 }
 
 # Version-specific constraint pins needed to match the original test environment.
@@ -119,13 +134,13 @@ def clone_repo(repo: str, commit: str, dest: Path) -> bool:
     return True
 
 
-def setup_venv(repo_name: str, repo_dir: Path, version: str = "") -> Optional[Path]:
+def setup_venv(repo_name: str, repo_dir: Path, version: str = "", python_bin: str = "") -> Optional[Path]:
     """Create uv venv and install package. Returns python path or None."""
     venv_dir = repo_dir / ".venv"
-    r = subprocess.run(
-        ["uv", "venv", str(venv_dir), "--quiet", "--no-seed"],
-        capture_output=True, text=True, timeout=60,
-    )
+    venv_cmd = ["uv", "venv", str(venv_dir), "--quiet", "--no-seed"]
+    if python_bin:
+        venv_cmd += ["--python", python_bin]
+    r = subprocess.run(venv_cmd, capture_output=True, text=True, timeout=60)
     if r.returncode != 0:
         print(f"    [venv failed] {r.stderr[:200]}")
         return None
@@ -148,22 +163,35 @@ def setup_venv(repo_name: str, repo_dir: Path, version: str = "") -> Optional[Pa
 
     extras = INSTALL_EXTRAS.get(repo_name, ["."])
 
-    # Install package + extras
-    for extra in extras:
+    # Install package.
+    # If extras list starts with "-e", treat the whole list as flat packages to install at once.
+    # Otherwise each entry is an editable extras spec like ".[dev]".
+    if extras and extras[0] == "-e":
+        # Flat install: e.g. ["-e", ".", "pytest", "pytest-mock"]
         r = subprocess.run(
-            uv_pip_install("-e", extra, "--quiet"),
+            uv_pip_install(*extras, "--quiet"),
             capture_output=True, text=True, timeout=300, cwd=str(repo_dir),
         )
         if r.returncode != 0:
-            # Try without extras
-            r2 = subprocess.run(
-                uv_pip_install("-e", ".", "--quiet"),
+            print(f"    [install failed] {r.stderr[:300]}")
+            return None
+    else:
+        # Editable extras: each entry is like ".[dev]" or ".[testing]"
+        for extra in extras:
+            r = subprocess.run(
+                uv_pip_install("-e", extra, "--quiet"),
                 capture_output=True, text=True, timeout=300, cwd=str(repo_dir),
             )
-            if r2.returncode != 0:
-                print(f"    [install failed] {r.stderr[:300]}")
-                return None
-            break
+            if r.returncode != 0:
+                # Fallback: plain editable without extras spec
+                r2 = subprocess.run(
+                    uv_pip_install("-e", ".", "--quiet"),
+                    capture_output=True, text=True, timeout=300, cwd=str(repo_dir),
+                )
+                if r2.returncode != 0:
+                    print(f"    [install failed] {r.stderr[:300]}")
+                    return None
+                break
 
     # Always ensure pytest is available
     subprocess.run(
@@ -254,19 +282,18 @@ Instructions:
 - Work only in {repo_dir}
 """
     else:
-        skill = SKILL_PATH.read_text() if SKILL_PATH.exists() else ""
-        return f"""{skill}
+        # Macro condition: same prompt as baseline but with @{VAR} session vars.
+        # SKILL.md is injected via --append-system-prompt-file (not embedded here)
+        # so it adds zero extra prompt overhead beyond the variable definitions.
+        return f"""You are fixing a bug in the {task['repo']} repository.
 
----
-
-You are fixing a bug in the {task['repo']} repository.
+Repository location: {repo_dir}
+Problem: {problem}
 
 Session variables pre-seeded for this task:
   @{{REPO}}     = {repo_dir}
   @{{TEST_CMD}} = {test_cmd}
   @{{TESTS}}    = {" ".join(ftp)}
-
-Problem: {problem}
 
 The following tests currently FAIL and must pass after your fix:
 {chr(10).join(ftp)}
@@ -274,8 +301,8 @@ The following tests currently FAIL and must pass after your fix:
 {test_note}
 
 Instructions:
-- Use @{{REPO}} instead of the full path in every command
-- Use @{{TEST_CMD}} to run the test suite
+- Use @{{REPO}} instead of the full path in every bash command
+- Use @{{TEST_CMD}} to run the test suite; @{{TESTS}} for individual test IDs
 - Read relevant source files to understand the codebase
 - Make the minimal change needed to fix the problem
 - The test files already exist (pre-applied) — do not create them
@@ -338,9 +365,14 @@ def run_claude(condition: str, task: dict, repo_dir: Path, test_cmd: str, max_tu
             "--dangerously-skip-permissions",
         ]
 
-        if condition == "macro" and INSTALL_DIR.exists():
-            settings_path = write_hook_settings(tmp)
-            cmd += ["--settings", str(settings_path)]
+        if condition == "macro":
+            # Inject SKILL.md as a system prompt addition (amortized cost, not per-task prompt)
+            if SKILL_PATH.exists():
+                cmd += ["--append-system-prompt-file", str(SKILL_PATH)]
+            # Wire the bash hook
+            if INSTALL_DIR.exists():
+                settings_path = write_hook_settings(tmp)
+                cmd += ["--settings", str(settings_path)]
 
         result = subprocess.run(
             cmd,
@@ -439,7 +471,8 @@ def run_task(task: dict, condition: str, max_turns: int) -> TaskResult:
             return result
 
         print(f"    setting up venv ...", flush=True)
-        python = setup_venv(repo_name, repo_dir, task.get("version", ""))
+        python_bin = REPO_PYTHON.get(repo_name, "")
+        python = setup_venv(repo_name, repo_dir, task.get("version", ""), python_bin)
         if not python:
             result.error = "venv/install failed"
             result.duration_seconds = round(time.time() - start, 1)
@@ -455,11 +488,16 @@ def run_task(task: dict, condition: str, max_turns: int) -> TaskResult:
         # Build test command for prompts and seed
         pytest_bin = python.parent / "pytest"
         # Only pytest's own test suite needs -p no:hypothesispytest (stale system plugin)
-        extra_flags_str = "-p no:hypothesispytest" if repo_name == "pytest" else ""
-        if pytest_bin.exists():
-            test_cmd = f"{pytest_bin} {' '.join(ftp)} -x -q {extra_flags_str}".strip()
+        if repo_name == "pytest":
+            repo_flags = "-p no:hypothesispytest"
+        elif repo_name == "requests":
+            repo_flags = "--timeout=10"
         else:
-            test_cmd = f"{python} -m pytest {' '.join(ftp)} -x -q {extra_flags_str}".strip()
+            repo_flags = ""
+        if pytest_bin.exists():
+            test_cmd = f"{pytest_bin} {' '.join(ftp)} -x -q {repo_flags}".strip()
+        else:
+            test_cmd = f"{python} -m pytest {' '.join(ftp)} -x -q {repo_flags}".strip()
         before_pass, before_out = run_tests(ftp, repo_dir, python)
         if before_pass:
             print(f"    WARNING: tests pass before fix — task may be trivial or already patched")
@@ -471,6 +509,8 @@ def run_task(task: dict, condition: str, max_turns: int) -> TaskResult:
             extra_test_flags = ["-p", "no:hypothesispytest"]
         elif repo_name == "flask":
             extra_test_flags = ["-W", "ignore::DeprecationWarning"]
+        elif repo_name == "requests":
+            extra_test_flags = ["--timeout=10"]
         else:
             extra_test_flags = []
 

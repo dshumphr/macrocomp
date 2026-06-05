@@ -1,0 +1,135 @@
+
+============================================================
+Task: psf__requests-2148
+Tests: ['test_requests.py::RequestsTestCase::test_DIGEST_AUTH_RETURNS_COOKIE', 'test_requests.py::RequestsTestCase::test_HTTP_200_OK_GET_ALTERNATIVE', 'test_requests.py::RequestsTestCase::test_HTTP_200_OK_HEAD', 'test_requests.py::RequestsTestCase::test_POSTBIN_GET_POST_FILES', 'test_requests.py::RequestsTestCase::test_auth_is_stripped_on_redirect_off_host', 'test_requests.py::RequestsTestCase::test_basicauth_with_netrc', 'test_requests.py::RequestsTestCase::test_cookie_quote_wrapped', 'test_requests.py::RequestsTestCase::test_generic_cookiejar_works', 'test_requests.py::RequestsTestCase::test_iter_content_handles_socket_error', 'test_requests.py::RequestsTestCase::test_unicode_multipart_post']
+
+  -- condition: baseline --
+    cloning psf/requests @ fe693c49 ...
+    setting up venv ...
+    applying test patch ...
+    running Claude (baseline) ...
+  result: PASS | bash calls: 7 | cmd chars: 2239 (~559 tok) | total input tok: 1966 | 109.1s
+
+  -- condition: macro --
+    cloning psf/requests @ fe693c49 ...
+    setting up venv ...
+    applying test patch ...
+    running Claude (macro) ...
+  result: PASS | bash calls: 10 | cmd chars: 2411 (~602 tok) | total input tok: 2103 | 110.3s
+  macro expansions used: ['@{REPO}']
+
+============================================================
+Task: psf__requests-2317
+Tests: ['test_requests.py::RequestsTestCase::test_HTTP_302_ALLOW_REDIRECT_GET', 'test_requests.py::RequestsTestCase::test_POSTBIN_GET_POST_FILES', 'test_requests.py::RequestsTestCase::test_POSTBIN_GET_POST_FILES_WITH_DATA', 'test_requests.py::RequestsTestCase::test_basicauth_with_netrc', 'test_requests.py::RequestsTestCase::test_json_param_post_content_type_works', 'test_requests.py::RequestsTestCase::test_manual_redirect_with_partial_body_read', 'test_requests.py::RequestsTestCase::test_requests_history_is_saved', 'test_requests.py::TestTimeout::test_encoded_methods']
+
+  -- condition: baseline --
+    cloning psf/requests @ 091991be ...
+    setting up venv ...
+    applying test patch ...
+    running Claude (baseline) ...
+  result: PASS | bash calls: 4 | cmd chars: 1171 (~292 tok) | total input tok: 1827 | 71.2s
+
+  -- condition: macro --
+    cloning psf/requests @ 091991be ...
+    setting up venv ...
+    applying test patch ...
+    running Claude (macro) ...
+  result: PASS | bash calls: 9 | cmd chars: 1270 (~317 tok) | total input tok: 1960 | 82.4s
+  macro expansions used: ['@{REPO}']
+
+============================================================
+Task: psf__requests-1963
+Tests: ['test_requests.py::RequestsTestCase::test_DIGESTAUTH_QUOTES_QOP_VALUE', 'test_requests.py::RequestsTestCase::test_DIGESTAUTH_WRONG_HTTP_401_GET', 'test_requests.py::RequestsTestCase::test_DIGEST_AUTH_RETURNS_COOKIE', 'test_requests.py::RequestsTestCase::test_DIGEST_HTTP_200_OK_GET', 'test_requests.py::RequestsTestCase::test_POSTBIN_GET_POST_FILES_WITH_DATA', 'test_requests.py::RequestsTestCase::test_param_cookiejar_works', 'test_requests.py::TestRedirects::test_requests_are_updated_each_time']
+
+  -- condition: baseline --
+    cloning psf/requests @ 110048f9 ...
+    setting up venv ...
+    applying test patch ...
+    running Claude (baseline) ...
+  result: PASS | bash calls: 3 | cmd chars: 971 (~242 tok) | total input tok: 1825 | 71.4s
+
+  -- condition: macro --
+    cloning psf/requests @ 110048f9 ...
+    setting up venv ...
+    applying test patch ...
+    running Claude (macro) ...
+  result: PASS | bash calls: 7 | cmd chars: 1722 (~430 tok) | total input tok: 1966 | 99.6s
+  macro expansions used: ['@{REPO}']
+
+============================================================
+Task: pylint-dev__pylint-6506
+Tests: ['tests/config/test_config.py::test_unknown_option_name', 'tests/config/test_config.py::test_unknown_short_option_name']
+
+  -- condition: baseline --
+    cloning pylint-dev/pylint @ 0a4204fd ...
+    setting up venv ...
+    applying test patch ...
+    running Claude (baseline) ...
+    tests FAILED:
+      lib-dynload, 
+/var/folders/l5/h6t9hd752xgdz4xqrpg44xp40000gn/T/swe_pylint-dev__pylint-6_4wqsaot9/pylint/.venv/lib/python3.11/site-packages
+=========================== short test summary info ============================
+FAILED tests/config/test_config.py::test_unknown_option_name - pylint.excepti...
+!!!!!!!!!!!!!!!!!!!!!!!!!! stopping after 1 failures !!!!!!!!!!!!!!!!!!!!!!!!!!!
+1 failed in 0.06s
+
+  result: ERR:error_max_turns | bash calls: 18 | cmd chars: 3648 (~912 tok) | total input tok: 2107 | 106.0s
+
+  -- condition: macro --
+    cloning pylint-dev/pylint @ 0a4204fd ...
+    setting up venv ...
+    applying test patch ...
+    running Claude (macro) ...
+    tests FAILED:
+      lib-dynload, 
+/var/folders/l5/h6t9hd752xgdz4xqrpg44xp40000gn/T/swe_pylint-dev__pylint-6_kjypqxl8/pylint/.venv/lib/python3.11/site-packages
+=========================== short test summary info ============================
+FAILED tests/config/test_config.py::test_unknown_option_name - pylint.excepti...
+!!!!!!!!!!!!!!!!!!!!!!!!!! stopping after 1 failures !!!!!!!!!!!!!!!!!!!!!!!!!!!
+1 failed in 0.05s
+
+  result: ERR:error_max_turns | bash calls: 15 | cmd chars: 2630 (~657 tok) | total input tok: 1978 | 122.8s
+  macro expansions used: ['@{REPO}']
+
+============================================================
+Task: pylint-dev__pylint-7228
+Tests: ['tests/config/test_config.py::test_regex_error', 'tests/config/test_config.py::test_csv_regex_error']
+
+  -- condition: baseline --
+    cloning pylint-dev/pylint @ d597f252 ...
+    setting up venv ...
+    [install failed]   × Failed to build `pylint @
+  │ file:///private/var/folders/l5/h6t9hd752xgdz4xqrpg44xp40000gn/T/swe_pylint-dev__pylint-7_2vjwpf61/pylint`
+  ├─▶ The build backend returned an error
+  ╰─▶ Call to `setuptools.build_meta.build_editable` failed (exit status: 1)
+
+      [stderr]
+      Traceback (most rec
+  result: ERR:venv/install failed | bash calls: 0 | cmd chars: 0 (~0 tok) | total input tok: 0 | 3.1s
+
+  -- condition: macro --
+    cloning pylint-dev/pylint @ d597f252 ...
+    setting up venv ...
+    [install failed]   × Failed to build `pylint @
+  │ file:///private/var/folders/l5/h6t9hd752xgdz4xqrpg44xp40000gn/T/swe_pylint-dev__pylint-7_1uwltbiv/pylint`
+  ├─▶ The build backend returned an error
+  ╰─▶ Call to `setuptools.build_meta.build_editable` failed (exit status: 1)
+
+      [stderr]
+      Traceback (most rec
+  result: ERR:venv/install failed | bash calls: 0 | cmd chars: 0 (~0 tok) | total input tok: 0 | 2.7s
+
+============================================================
+SUMMARY
+============================================================
+
+Metric                                Baseline      Macro
+-------------------------------------------------------
+Avg bash cmd chars (tool-call proxy)     1460.3     1801.0
+Avg bash calls                             4.7        8.7
+Avg total input tokens                  1872.7     2009.7
+Tasks passed                                 3          3
+Cmd-char reduction %                               -23.3%
+Total input token reduction %                       -7.3%
+
+Logs: /Users/danielhumphries/src/macrocomp/macro-compression/logs/
